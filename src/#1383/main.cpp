@@ -6,21 +6,21 @@
 #include <set>
 using namespace std;
 
-// struct Activity {
-//     int avg, level;
-//     string str;
-//     bool operator>(const Activity& right) {
-//         if (this->avg > right.avg) return true;
-//         if (this->avg == right.avg && this->level > right->level) return true;
-//         if (this->level == right.level && this->str < right.str) return true; 
-//         return false;
-//     }
-// };
+struct Activity {
+    int avg, level;
+    string str;
+    bool operator<(const Activity& right) const {
+        if (this->avg > right.avg) return true;
+        if (this->avg == right.avg && this->level < right.level) return true;
+        if (this->level == right.level && this->str < right.str) return true; 
+        return false;
+    }
+};
 
 int main () {
     string op;
     map<string, vector<int>> m;
-    // set<Activity> s;
+    set<Activity> s;
 
     while (true) {
         cin >> op;
@@ -56,7 +56,7 @@ int main () {
             } else if (order == "traverse") {
                 for (auto& [key, vec] : m) {
                     cout << key << " ";
-                    for (auto& num : vec) {
+                    for (auto num : vec) {
                         cout << num << " ";
                     }
                     cout << endl;
@@ -89,7 +89,35 @@ int main () {
                 else cout << "Error" << endl;
             }
         } else if (op == "set") {
-
+            if (order == "size") {
+                cout << s.size() << endl;
+            } else if (order == "insert") {
+                int avg, level;
+                string str;
+                cin >> avg >> level >> str;
+                Activity item{avg, level, str};
+                s.insert(item);
+            } else if (order == "erase"){
+                int avg, level;
+                string str;
+                cin >> avg >> level >> str;
+                Activity item{avg, level, str};
+                auto tgt = s.find(item);
+                if (tgt != s.end()) s.erase(tgt);
+                else cout << "Error" << endl;
+            } else if (order == "count"){
+                int avg, level;
+                string str;
+                cin >> avg >> level >> str;
+                Activity item{avg, level, str};
+                auto tgt = s.find(item);
+                if (tgt != s.end()) cout << 1 << endl;
+                else cout << 0 << endl;
+            } else if (order == "traverse"){
+                for (auto& [avg, level, str] : s) {
+                    cout << avg << " " << level << " " << str << endl;
+                }
+            }
         }
     }
     return 0;

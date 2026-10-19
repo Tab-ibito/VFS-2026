@@ -7,9 +7,9 @@
       "request": "launch",
       "args": [],
       "stopAtEntry": false,
-      "externalConsole": true,
-      "cwd": "//wsl.localhost/Ubuntu/home/fan_wenk/VFS-2026/src/#1383",
-      "program": "//wsl.localhost/Ubuntu/home/fan_wenk/VFS-2026/src/#1383/build/Debug/outDebug",
+      "externalConsole": false,
+      "cwd": "/home/fan_wenk/VFS-2026/src/#1383",
+      "program": "/home/fan_wenk/VFS-2026/src/#1383/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
