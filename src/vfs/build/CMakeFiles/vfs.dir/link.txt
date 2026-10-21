@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/vfs.dir/main.cpp.o -o vfs 

@@ -72,5 +72,6 @@
   },
   "editor.inlineCompletionsAccessibilityVerbose": true,
   "editor.tabCompletion": "on",
-  "emmet.triggerExpansionOnTab": true
+  "emmet.triggerExpansionOnTab": true,
+  "cmake.sourceDirectory": "/home/fan_wenk/VFS-2026/src/vfs"
 }
