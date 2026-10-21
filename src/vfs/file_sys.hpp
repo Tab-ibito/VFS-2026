@@ -91,6 +91,10 @@ class File {
             buf.push(content.back());
             this->content.pop_back();
         }
+        // 没到offset的地方先填充
+        while (this->content.size() < start) {
+            this->content.push_back('0');
+        }
         this->content += hexdata;
         int cnt = 0, len = hexdata.size();
         // 覆写
@@ -157,8 +161,9 @@ class Directory {
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type == "bin") return false;
+        std::string old_content = file->content;
         file->append(content);
-        this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
+        this->filesys->add_history(new Operation(this, name, order, file->type, old_content));
         return true;
     }
 
@@ -193,8 +198,9 @@ class Directory {
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type != "bin") return false;
+        std::string old_content = file->content;
         file->write_bin(offset, hexdata);
-        this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
+        this->filesys->add_history(new Operation(this, name, order, file->type, old_content));
         return true;
     }
 
@@ -202,9 +208,8 @@ class Directory {
         std::string order = "rm";
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
-        this->content.erase(name); // 清除content的文件名
-        delete file;
         if (is_recorded) this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
+        this->content.erase(name); // 清除content的文件名
         return true;
     }
 
@@ -217,27 +222,29 @@ class Directory {
             std::cout << name << ':' << "dir" << ':' << 0 << std::endl;
         } else {
             File* file = *ptr;
-            std::cout << name << ':' << file->type << ':' <<file->get_size() << std::endl;
+            std::cout << name << ':' << file->type << ':' << file->get_size() << std::endl;
         }
         return true;
     }
 
     void print_topk(int k) {
-        if (k > this->content.size()) k = this->content.size();
-        std::map<int, std::string, std::greater<int>> seq;
+        std::vector<std::pair<std::string, int>> seq;
         for (auto& item : this->content) {
             std::string name = item.first;
             if(is_valid_file(name)) {
                 File* file = *std::get_if<File*>(&(this->content.at(name)));
-                seq.insert({file->get_size(), name});
-            } else {
-                seq.insert({0, name});
+                seq.push_back({name, file->get_size()});
             }
         }
+        std::sort(seq.begin(), seq.end(), [](auto&a, auto& b){
+            if (a.second > b.second) return true;
+            if (a.second < b.second) return false;
+            return a.first < b.first;
+        });
         int cnt = 0;
         auto it = seq.begin();
-        while (cnt < k) {
-            std::cout << it->second << ':' << it->first << std::endl;
+        while (cnt < k && it != seq.end()) {
+            std::cout << it->first << ':' << it->second << std::endl;
             cnt ++;
             it ++;
         }
@@ -263,10 +270,9 @@ std::vector<std::string> FileSys::split_path(std::string& path) {
         if (c == '/') {
             if (!token.empty()) res.push_back(token);
             token = "";
-        }
-        token.push_back(c);
+        } else token.push_back(c);
     }
-    res.push_back(token);
+    if (!token.empty()) res.push_back(token);
     return res;
 }
 
@@ -279,8 +285,8 @@ bool FileSys::switch_path(std::string& path) {
     if (path[0] == '/') {
         new_path = root;
         for (auto& token : parsed) {
-            // 访问到不存在的文件夹，静默处理
-            if (new_path->content.find(token) != new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return true; 
+            // 访问到不存在的文件夹
+            if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return false; 
             new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
         }
     } else {
@@ -291,8 +297,8 @@ bool FileSys::switch_path(std::string& path) {
                 if (new_path->root) return false; // 检测根目录越界
                 new_path = new_path->parent;
             } else {
-            // 访问到不存在的文件夹，静默处理
-                if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return true; 
+            // 访问到不存在的文件夹
+                if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return false; 
                 new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
             }
         }
@@ -333,6 +339,6 @@ void FileSys::add_history(Operation* new_history) {
 
 FileSys::FileSys() {
     // 构造函数
-    root = new Directory(this);
-    cwd = root;
+    this->root = new Directory(this);
+    this->cwd = this->root;
 }
