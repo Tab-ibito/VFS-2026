@@ -1,3 +1,0 @@
-/home/fan_wenk/VFS-2026/src/vfs/build/CMakeFiles/vfs.dir
-/home/fan_wenk/VFS-2026/src/vfs/build/CMakeFiles/edit_cache.dir
-/home/fan_wenk/VFS-2026/src/vfs/build/CMakeFiles/rebuild_cache.dir
