@@ -38,6 +38,7 @@ int main() {
         if (order == "mkdir") {
             std::string name;
             std::cin >> name;
+            FileSys sys_copy = filesys;
             if (!filesys.cwd->make_dir(name))
                 std::cout << "Invalid operation" << std::endl;
         } else if (order == "ls") {
@@ -57,7 +58,8 @@ int main() {
             std::string name, content;
             std::cin >> name;
             content = get_content();
-            filesys.cwd->append(name, content);            
+            if(!filesys.cwd->append(name, content))
+                std::cout << "Invalid operation" << std::endl;
         } else if (order == "cat") {
             std::string name;
             std::cin >> name;
@@ -86,6 +88,13 @@ int main() {
             std::string name;
             std::cin >> name;
             if (!filesys.cwd->get_stat(name))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "top") {
+            int k;
+            std::cin >> k;
+            filesys.cwd->print_topk(k);
+        } else if (order == "undo") {
+            if (!filesys.undo())
                 std::cout << "Invalid operation" << std::endl;
         }
     }

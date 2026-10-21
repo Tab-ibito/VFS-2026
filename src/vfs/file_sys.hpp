@@ -4,13 +4,55 @@
 #include <map>
 #include <variant>
 #include <stack>
+#include <algorithm>
+class Operation;
+class File;
+class Directory;
+class FileSys{
+    private:
+    std::vector<std::string> split_path(std::string& path);
+    std::stack<Operation*> history;
+    public:
+    Directory* cwd;
+    Directory* root;
+    bool switch_path(std::string& path);
+    void add_history(Operation* op);
+    bool undo();
+    FileSys();
+    ~FileSys(){};
+};
+
+class Operation {
+    public:
+    Directory* dir;
+    std::string name, type, file_type;
+    bool is_created, is_removed;
+    std::string old_content;
+    // 增（文件夹 / 文件），删改（文件）
+    Operation(Directory* dir, std::string& type) {
+        this->dir = dir;
+        this->type = type;
+    }
+    Operation(Directory* dir, std::string& name, std::string& type) {
+        this->dir = dir;
+        this->name = name;
+        this->type = type;
+    }
+    Operation(Directory* dir, std::string& name, std::string& type, std::string& file_type, std::string& old_content) {
+        this->dir = dir;
+        this->name = name;
+        this->type = type;
+        this->file_type = file_type;
+        this->old_content = old_content;
+    }
+};  
 
 class File {
     public:
     std::string type;
     std::string name;
     std::string content;
-    File(std::string& type, std::string& name, std::string content) {
+    File(std::string& type, std::string& name, std::string& content) {
         this->type = type;
         this->name = name;
         this->content = content;
@@ -66,59 +108,80 @@ class File {
 };
 
 class Directory {
+    private:
+    bool is_valid_file(std::string& name) {
+        return !(this->content.find(name) == this->content.end() || std::get_if<File*>(&(this->content.at(name))) == nullptr);
+    }
+    
     public:
+    FileSys* filesys; // 便于撤销操作回传
     bool root = false; // 是否是根目录
     std::string name; // 文件夹名
     Directory* parent; // 父文件夹指针
     std::map<std::string, std::variant<Directory*, File*>> content; // 子文件指针，键值是文件夹名
-    std::string get_path(); // 获取路径
 
-    Directory() {
+    Directory(FileSys* filesys) {
         root = true;
+        this->filesys = filesys;
     }
 
-    Directory(std::string& name, Directory* parent) {
+    Directory(std::string& name, Directory* parent, FileSys* filesys) {
         this->name = name;
         this->parent = parent;
+        this->filesys = filesys;
     }
 
     bool make_dir(std::string& name) {
-        // 创建子目录
+        // 创建子目录 mkdir
+        std::string order = "mkdir";
         if (this->content.find(name) != this->content.end()) return false;
-        Directory* new_dir = new Directory(name, this);
+        Directory* new_dir = new Directory(name, this, this->filesys);
         this->content.insert({name, new_dir});
+        this->filesys->add_history(new Operation(this, name, order));
         return true;
     }
 
-    bool create_file(std::string& type, std::string& name, std::string& content) {
+    bool create_file(std::string& type, std::string& name, std::string& content, bool is_recorded = true) {
         // 创建文件
+        std::string order = "create";
         if (this->content.find(name) != this->content.end()) return false;
         File* new_file = new File(type, name, content);
         this->content.insert({name, new_file});
+        if (is_recorded) this->filesys->add_history(new Operation(this, name, order, type, content));
         return true;
     }
 
     bool append(std::string& name, std::string& content) {
         // 追加内容
-        if (this->content.find(name) == this->content.end() || std::get_if<File*>(&(this->content.at(name))) == nullptr) return false;
+        std::string order = "append";
+        if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type == "bin") return false;
         file->append(content);
+        this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
         return true;
     }
 
     bool output(std::string& name) {
         // 输出文本文档内容
-        if (this->content.find(name) == this->content.end() || std::get_if<File*>(&(this->content.at(name))) == nullptr) return false;
+        if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type == "bin") return false;
         file->output();
         return true;
     }
 
+    bool get_type(std::string& name, std::string& file_type) {
+        // 获取文件类型
+        if (!is_valid_file(name)) return false;
+        File* file = *std::get_if<File*>(&(this->content.at(name)));
+        file_type = file->type;
+        return true;
+    }
+
     bool read_bin(std::string& name, int offset, int length) {
         // 读二进制文件内容
-        if (this->content.find(name) == this->content.end() || std::get_if<File*>(&(this->content.at(name))) == nullptr) return false;
+        if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type != "bin") return false;
         return file->read_bin(offset, length);
@@ -126,22 +189,27 @@ class Directory {
 
     bool write_bin(std::string& name, int offset, std::string& hexdata) {
         // 写二进制文件内容
-        if (this->content.find(name) == this->content.end() || std::get_if<File*>(&(this->content.at(name))) == nullptr) return false;
+        std::string order = "write";
+        if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type != "bin") return false;
         file->write_bin(offset, hexdata);
+        this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
         return true;
     }
 
-    bool remove_file(std::string& name) {
-        if (this->content.find(name) == this->content.end() || std::get_if<File*>(&(this->content.at(name))) == nullptr) return false;
+    bool remove_file(std::string& name, bool is_recorded = true) {
+        std::string order = "rm";
+        if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         this->content.erase(name); // 清除content的文件名
         delete file;
+        if (is_recorded) this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
         return true;
     }
 
     bool get_stat(std::string name) {
+        // 输出文件类型和大小
         if (this->content.find(name) == this->content.end()) return false;
         auto ptr = std::get_if<File*>(&(this->content.at(name)));
         if (ptr == nullptr) {
@@ -154,72 +222,117 @@ class Directory {
         return true;
     }
 
+    void print_topk(int k) {
+        if (k > this->content.size()) k = this->content.size();
+        std::map<int, std::string, std::greater<int>> seq;
+        for (auto& item : this->content) {
+            std::string name = item.first;
+            if(is_valid_file(name)) {
+                File* file = *std::get_if<File*>(&(this->content.at(name)));
+                seq.insert({file->get_size(), name});
+            } else {
+                seq.insert({0, name});
+            }
+        }
+        int cnt = 0;
+        auto it = seq.begin();
+        while (cnt < k) {
+            std::cout << it->second << ':' << it->first << std::endl;
+            cnt ++;
+            it ++;
+        }
+    }
+
     void print_dir() {
         // ls 指令打印当前目录，带空格
-        std::string output;
         for (auto item : this->content) {
-            output += item.first;
-            if (std::get_if<Directory*>(&item.second) != nullptr) output += '/';
-            output += '\n';
+            std::cout << item.first;
+            if (std::get_if<Directory*>(&item.second) != nullptr) std::cout << '/';
+            std::cout << std::endl;
+            
         }
-        std::cout << output;
     }
-    ~Directory();
+    ~Directory(){}
 };
 
-class FileSys {
-    private:
-    std::vector<std::string> split_path(std::string& path) {
-        // 分割路径
-        std::vector<std::string> res;
-        std::string token;
-        for (auto& c : path) {
-            if (c == '/') {
-                if (!token.empty()) res.push_back(token);
-                token = "";
-            }
-            token.push_back(c);
+std::vector<std::string> FileSys::split_path(std::string& path) {
+    // 分割路径
+    std::vector<std::string> res;
+    std::string token;
+    for (auto& c : path) {
+        if (c == '/') {
+            if (!token.empty()) res.push_back(token);
+            token = "";
         }
-        res.push_back(token);
-        return res;
+        token.push_back(c);
     }
+    res.push_back(token);
+    return res;
+}
 
-    public:
-    Directory* cwd; // 现在工作文件位置
-    Directory* root; // 根目录
-    FileSys() {
-        // 构造函数
-        root = new Directory();
-        cwd = root;
-    }
-
-    bool switch_path(std::string& path) {
-        // 更改路径
-        if (path.empty()) return false;
-        Directory* new_path;
-        std::vector<std::string> parsed = split_path(path);
-        if (path[0] == '/') {
-            new_path = root;
-            for (auto& token : parsed) {
-                // 访问到不存在的文件夹，静默处理
-                if (new_path->content.find(token) != new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return true; 
+bool FileSys::switch_path(std::string& path) {
+    // 更改路径
+    std::string order = "cd";
+    if (path.empty()) return false;
+    Directory* new_path;
+    std::vector<std::string> parsed = split_path(path);
+    if (path[0] == '/') {
+        new_path = root;
+        for (auto& token : parsed) {
+            // 访问到不存在的文件夹，静默处理
+            if (new_path->content.find(token) != new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return true; 
+            new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
+        }
+    } else {
+        new_path = cwd;
+        for (auto& token : parsed) {
+            if (token == ".") continue;
+            else if (token == "..") {
+                if (new_path->root) return false; // 检测根目录越界
+                new_path = new_path->parent;
+            } else {
+            // 访问到不存在的文件夹，静默处理
+                if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return true; 
                 new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
             }
-        } else {
-            new_path = cwd;
-            for (auto& token : parsed) {
-                if (token == ".") continue;
-                else if (token == "..") {
-                    if (new_path->root) return false; // 检测根目录越界
-                    new_path = new_path->parent;
-                } else {
-                // 访问到不存在的文件夹，静默处理
-                    if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return true; 
-                    new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
-                }
-            }
         }
-        cwd = new_path;
-        return true;
     }
-};
+    this->add_history(new Operation(this->cwd, order));
+    cwd = new_path;
+    return true;
+}
+
+bool FileSys::undo() {
+    // TODO for bonus
+    if (history.empty()) return false;
+
+    Operation* op = history.top();
+    if (op->type == "cd") {
+        // 恢复旧的内容
+        this->cwd = op->dir;
+    } else if (op->type == "mkdir") {
+        this->cwd->content.erase(op->name);
+    } else if (op->type == "create") {
+        // 逆操作删掉文件
+        this->cwd->remove_file(op->name, false);
+    } else if (op->type == "append" || op->type == "write") {
+        // 可以先删再建
+        this->cwd->remove_file(op->name, false);
+        this->cwd->create_file(op->file_type, op->name, op->old_content, false);
+    } else if (op->type == "rm") {
+        // 重建文件
+        this->cwd->create_file(op->file_type, op->name, op->old_content, false);
+    }
+    this->history.pop();
+    return true;
+}
+
+void FileSys::add_history(Operation* new_history) {
+    this->history.push(new_history);
+}
+
+FileSys::FileSys() {
+    // 构造函数
+    root = new Directory(this);
+    cwd = root;
+}
