@@ -1,0 +1,15 @@
+util.cpp
+util.cpp:int util() {}
+design.md
+lib/
+main.cpp
+readme.txt
+src/
+readme.txt:txt:9
+src:dir:0
+readme.txt:hello vfs!
+util.cpp:txt:13
+Invalid operation
+main.cpp:int main() {}// ok
+merged.txt:
+Invalid operation

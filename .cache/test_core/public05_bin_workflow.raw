@@ -1,0 +1,15 @@
+data.bin:bin:3
+data.bin:01 02 03
+data.bin:02 03
+data.bin:01 FF 03
+data.bin:01 FF 03 AA BB
+data.bin:bin:5
+data.bin:01 FF 03
+data.bin:bin:5
+Invalid operation
+Invalid operation
+note.txt:hello world
+full.txt:
+full.txt:txt:0
+data.bin:03 AA
+Invalid operation

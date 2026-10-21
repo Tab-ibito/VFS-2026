@@ -13,6 +13,18 @@
 #include <iostream>
 #include "file_sys.hpp"
 
+std::string get_content(bool is_binary = false) {
+    char c;
+    std::string content;
+    std::cin >> c;
+    do {
+        c = std::cin.get();
+        if (!is_binary || c != ' ') content.push_back(c);
+    } while (c != '"');
+    content.pop_back();
+    return content;
+}
+
 int main() {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
@@ -29,11 +41,51 @@ int main() {
             if (!filesys.cwd->make_dir(name))
                 std::cout << "Invalid operation" << std::endl;
         } else if (order == "ls") {
-            std::cout << filesys.print_cwd(); // 已自带换行
+            filesys.cwd->print_dir(); // 已自带换行
         } else if (order == "cd") {
             std::string path;
             std::cin >> path;
             if (!filesys.switch_path(path))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "create") {
+            std::string type, name, content;
+            std::cin >> type >> name;
+            content = get_content(type == "bin");
+            if (!filesys.cwd->create_file(type, name, content))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "append") {
+            std::string name, content;
+            std::cin >> name;
+            content = get_content();
+            filesys.cwd->append(name, content);            
+        } else if (order == "cat") {
+            std::string name;
+            std::cin >> name;
+            if (!filesys.cwd->output(name))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "read") {
+            std::string name;
+            int length, offset;
+            std::cin >> name;
+            std::cin >> offset >> length;
+            if (!filesys.cwd->read_bin(name, offset, length))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "write") {
+            std::string name, hexdata;
+            int offset;
+            std::cin >> name >> offset;
+            hexdata = get_content(true);
+            if (!filesys.cwd->write_bin(name, offset, hexdata))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "rm") {
+            std::string name;
+            std::cin >> name;
+            if (!filesys.cwd->remove_file(name))
+                std::cout << "Invalid operation" << std::endl;
+        } else if (order == "stat") {
+            std::string name;
+            std::cin >> name;
+            if (!filesys.cwd->get_stat(name))
                 std::cout << "Invalid operation" << std::endl;
         }
     }
