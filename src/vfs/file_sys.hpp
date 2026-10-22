@@ -114,6 +114,15 @@ class File {
     ~File(){}
 };
 
+struct CompareSize {
+    bool operator()(const std::pair<std::string, int>& a,
+                    const std::pair<std::string, int>& b) const {
+        if (a.second != b.second)
+            return a.second > b.second;
+        return a.first < b.first;
+    }
+};
+
 class Directory {
     private:
     bool is_valid_file(std::string& name) {
@@ -127,6 +136,7 @@ class Directory {
     Directory* parent; // 父文件夹指针
     std::unordered_map<std::string, std::variant<Directory*, File*>> content; // 子文件指针，键值是文件夹名
     std::set<std::string> seq_dict; // 按照字典序输出文件
+    std::set<std::pair<std::string, int>, CompareSize> seq_size; // 按照字典序输出文件
 
     Directory(FileSys* filesys) {
         root = true;
@@ -158,6 +168,7 @@ class Directory {
         this->content.insert({name, new_file});
         if (is_recorded) this->filesys->add_history(new Operation(this, name, order, type, content));
         this->seq_dict.insert(name);
+        this->seq_size.insert({name, new_file->get_size()});
         return true;
     }
 
@@ -168,8 +179,10 @@ class Directory {
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type == "bin") return false;
         std::string old_content = file->content;
+        this->seq_size.erase({name, file->get_size()});
         file->append(content);
         this->filesys->add_history(new Operation(this, name, order, file->type, old_content));
+        this->seq_size.insert({name, file->get_size()});
         return true;
     }
 
@@ -196,9 +209,11 @@ class Directory {
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type != "bin") return false;
+        this->seq_size.erase({name, file->get_size()});
         std::string old_content = file->content;
         file->write_bin(offset, hexdata);
         this->filesys->add_history(new Operation(this, name, order, file->type, old_content));
+        this->seq_size.insert({name, file->get_size()});
         return true;
     }
 
@@ -207,6 +222,7 @@ class Directory {
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (is_recorded) this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
+        this->seq_size.erase({name, file->get_size()});
         this->content.erase(name); // 清除content的文件名
         this->seq_dict.erase(name);
         return true;
@@ -227,24 +243,9 @@ class Directory {
     }
 
     void print_topk(int k) {
-        std::ios::sync_with_stdio(false);
-        std::cin.tie(nullptr);
-        std::vector<std::pair<std::string, int>> seq;
-        for (auto& item : this->content) {
-            std::string name = item.first;
-            if(is_valid_file(name)) {
-                File* file = *std::get_if<File*>(&(this->content.at(name)));
-                seq.push_back({name, file->get_size()});
-            }
-        }
-        std::sort(seq.begin(), seq.end(), [](auto&a, auto& b){
-            if (a.second > b.second) return true;
-            if (a.second < b.second) return false;
-            return a.first < b.first;
-        });
         int cnt = 0;
-        auto it = seq.begin();
-        while (cnt < k && it != seq.end()) {
+        auto it = seq_size.begin();
+        while (cnt < k && it != seq_size.end()) {
             std::cout << it->first << ':' << it->second << '\n';
             cnt ++;
             it ++;
@@ -316,8 +317,11 @@ bool FileSys::undo() {
     } else if (op->type == "create") {
         // 逆操作删掉文件
         this->cwd->remove_file(op->name, false);
-    } else if (op->type == "append" || op->type == "write") {
+    } else if (op->type == "append") {
         // 可以先删再建
+        this->cwd->remove_file(op->name, false);
+        this->cwd->create_file(op->file_type, op->name, op->old_content, false);
+    } else if (op->type == "write") {
         this->cwd->remove_file(op->name, false);
         this->cwd->create_file(op->file_type, op->name, op->old_content, false);
     } else if (op->type == "rm") {
