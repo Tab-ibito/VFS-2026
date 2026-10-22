@@ -30,7 +30,6 @@ int main() {
     int n;
     std::cin >> n;
     FileSys filesys;
-
     for (int i=0; i<n; i++) {
         std::string order;
         std::cin >> order;
@@ -78,10 +77,18 @@ int main() {
             if (!filesys.cwd->write_bin(name, offset, hexdata))
                 std::cout << "Invalid operation" << '\n';
         } else if (order == "rm") {
-            std::string name;
-            std::cin >> name;
-            if (!filesys.cwd->remove_file(name))
-                std::cout << "Invalid operation" << '\n';
+            std::string arg1, name;
+            std::cin >> arg1;
+            if (arg1 != "-r") {
+                name = arg1;
+                if (!filesys.cwd->remove_file(name))
+                    std::cout << "Invalid operation" << '\n';
+            } else {
+                std::cin >> name;
+                if (!filesys.cwd->remove_dir(name))
+                    std::cout << "Invalid operation" << '\n';                
+            }
+
         } else if (order == "stat") {
             std::string name;
             std::cin >> name;
@@ -94,7 +101,13 @@ int main() {
         } else if (order == "undo") {
             if (!filesys.undo())
                 std::cout << "Invalid operation" << '\n';
+        } else if (order == "tree") {
+            filesys.print_tree(filesys.cwd);
+        } else if (order == "redo") {
+            if (!filesys.redo())
+                std::cout << "Invalid operation" << '\n';
         } else if (order == "r") {
+            //　调试用
             std::cout << "---" <<std::endl;
         }
     }
