@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <set>
+#include <cmath>
 
 class Operation;
 class File;
@@ -399,7 +400,7 @@ bool FileSys::undo() {
         this->cwd->append(op->name, op->old_content, false, op->diff);
     } else if (op->type == "write") {
         File* file = *std::get_if<File*>(&(this->cwd->content.at(op->name)));
-        std::string old_content = file->content.substr(op->diff * 2);
+        std::string old_content = file->content.substr(op->diff * 2, op->old_content.size());
         redo_list.push_back(new Operation(this->cwd, op->name, op->type, file->type, op->diff, false, old_content)); // TODO: 需要优化
         this->cwd->write_bin(op->name, op->diff, op->old_content, false, op->is_end);
     } else if (op->type == "rm") {
