@@ -85,8 +85,8 @@ int main() {
                     std::cout << "Invalid operation" << '\n';
             } else {
                 std::cin >> name;
-                if (!filesys.cwd->remove_dir(name))
-                    std::cout << "Invalid operation" << '\n';                
+                if (!filesys.cwd->remove_general(name))
+                    std::cout << "Invalid operation" << '\n';
             }
 
         } else if (order == "stat") {
@@ -107,7 +107,7 @@ int main() {
             if (!filesys.redo())
                 std::cout << "Invalid operation" << '\n';
         } else if (order == "r") {
-            //　调试用
+            //　调试用，刷新输出的缓冲
             std::cout << "---" <<std::endl;
         }
     }

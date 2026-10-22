@@ -24,6 +24,7 @@ class FileSys{
     void add_history(Operation* op);
     bool undo();
     bool redo();
+    std::string get_absolute_path(Directory* dir);
     FileSys();
     ~FileSys(){};
     void print_tree(Directory* dir);
@@ -75,6 +76,11 @@ class Operation {
         this->name = name;
         this->type = type;
         this->old_dir = old_dir;
+    }
+    Operation(Directory* dir, std::string& name, std::string& type, std::string& old_content){
+        this->dir = dir;
+        this->name = name;
+        this->old_content = old_content;
     }
 };  
 
@@ -276,6 +282,13 @@ class Directory {
         return true;
     }
 
+    bool remove_general(std::string name, bool is_recorded = true, bool is_redo = false) {
+        // 给main函数使用的接口
+        if (is_valid_dir(name)) return remove_dir(name, is_recorded, is_redo);
+        if (is_valid_file(name)) return remove_file(name, is_recorded, is_redo);
+        return false;
+    }
+
     bool remove_dir(std::string name, bool is_recorded = true, bool is_redo = false) {
         std::string order = "rm_dir";
         if (!is_valid_dir(name)) return false;
@@ -335,6 +348,16 @@ void FileSys::split_path(std::string& path, std::vector<std::string>& res) {
     if (!token.empty()) res.push_back(token);
 }
 
+std::string FileSys::get_absolute_path(Directory* dir) {
+    std::string res = "";
+    while (!dir->root) {
+        res = '/' + dir->name + res;
+        dir = dir->parent;
+    }
+    if (res.empty()) res = '/';
+    return res;
+}
+
 bool FileSys::switch_path(std::string& path, bool is_recorded = true, bool is_redo = false) {
     // 更改路径
     std::string order = "cd";
@@ -353,7 +376,7 @@ bool FileSys::switch_path(std::string& path, bool is_recorded = true, bool is_re
             if (new_path->root) return false; // 检测根目录越界
             new_path = new_path->parent;
         } else {
-        // 访问到不存在的文件夹
+            // 访问到不存在的文件夹
             if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return false; 
             new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
         }
@@ -372,12 +395,13 @@ bool FileSys::undo() {
     Operation* op = history.top();
     if (op->type == "cd") {
         // 恢复旧的内容
+        std::string path = this->get_absolute_path(this->cwd);
         redo_list.push_back(new Operation(this->cwd, op->type));
         this->cwd = op->dir;
     } else if (op->type == "mkdir") {
-        redo_list.push_back(new Operation(this->cwd, op->name, op->type));
-        this->cwd->content.erase(op->name);
-        this->cwd->seq_dict.erase(op->name);
+        Directory* dir = *std::get_if<Directory*>(&(this->cwd->content.at(op->name)));
+        redo_list.push_back(new Operation(this->cwd, op->name, op->type, dir));
+        this->cwd->remove_dir(op->name, false, true);
     } else if (op->type == "create") {
         // 逆操作删掉文件
         File* file = *std::get_if<File*>(&(this->cwd->content.at(op->name)));
@@ -399,6 +423,7 @@ bool FileSys::undo() {
         redo_list.push_back(new Operation(this->cwd, op->name, op->type));
         this->cwd->create_file(op->file_type, op->name, op->old_content, false);
     } else if (op->type == "rm_dir") {
+        // 指针重新接上文件夹
         redo_list.push_back(new Operation(this->cwd, op->name, op->type));
         this->cwd->content.insert({op->name, op->old_dir});
         this->cwd->seq_dict.insert(op->name);
@@ -417,7 +442,9 @@ bool FileSys::redo() {
         this->add_history(new Operation(this->cwd, op));
         this->cwd = todo->dir;
     } else if (op == "mkdir") {
-        this->cwd->make_dir(todo->name, true, true);
+        this->add_history(new Operation(this->cwd, todo->name, todo->type));
+        this->cwd->content.insert({todo->name, todo->old_dir});
+        this->cwd->seq_dict.insert(todo->name);        
     } else if (op == "create") {
         this->cwd->create_file(todo->file_type, todo->name, todo->old_content, true, true);
     } else if (op == "append") {
