@@ -284,23 +284,18 @@ bool FileSys::switch_path(std::string& path) {
     std::vector<std::string> parsed = split_path(path);
     if (path[0] == '/') {
         new_path = root;
-        for (auto& token : parsed) {
-            // 访问到不存在的文件夹
-            if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return false; 
-            new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
-        }
     } else {
         new_path = cwd;
-        for (auto& token : parsed) {
-            if (token == ".") continue;
-            else if (token == "..") {
-                if (new_path->root) return false; // 检测根目录越界
-                new_path = new_path->parent;
-            } else {
-            // 访问到不存在的文件夹
-                if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return false; 
-                new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
-            }
+    }
+    for (auto& token : parsed) {
+        if (token == ".") continue;
+        else if (token == "..") {
+            if (new_path->root) return false; // 检测根目录越界
+            new_path = new_path->parent;
+        } else {
+        // 访问到不存在的文件夹
+            if (new_path->content.find(token) == new_path->content.end() || std::get_if<Directory*>(&(new_path->content.at(token))) == nullptr) return false; 
+            new_path = *std::get_if<Directory*>(&(new_path->content.at(token)));
         }
     }
     this->add_history(new Operation(this->cwd, order));
