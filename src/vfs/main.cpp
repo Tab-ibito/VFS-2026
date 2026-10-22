@@ -84,7 +84,13 @@ int main() {
                 if (!filesys.cwd->remove_file(name))
                     std::cout << "Invalid operation" << '\n';
             } else {
-                std::cin >> name;
+                std::getline(std::cin, name);
+                name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
+                if (name.empty()) {
+                    if (!filesys.cwd->remove_file(arg1))
+                        std::cout << "Invalid operation" << '\n';
+                    continue;
+                }
                 if (!filesys.cwd->remove_general(name))
                     std::cout << "Invalid operation" << '\n';
             }
@@ -107,7 +113,7 @@ int main() {
             if (!filesys.redo())
                 std::cout << "Invalid operation" << '\n';
         } else if (order == "r") {
-            //　调试用，刷新输出的缓冲
+            //　调试用
             std::cout << "---" <<std::endl;
         }
     }

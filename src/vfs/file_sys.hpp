@@ -24,7 +24,6 @@ class FileSys{
     void add_history(Operation* op);
     bool undo();
     bool redo();
-    std::string get_absolute_path(Directory* dir);
     FileSys();
     ~FileSys(){};
     void print_tree(Directory* dir);
@@ -76,11 +75,6 @@ class Operation {
         this->name = name;
         this->type = type;
         this->old_dir = old_dir;
-    }
-    Operation(Directory* dir, std::string& name, std::string& type, std::string& old_content){
-        this->dir = dir;
-        this->name = name;
-        this->old_content = old_content;
     }
 };  
 
@@ -348,16 +342,6 @@ void FileSys::split_path(std::string& path, std::vector<std::string>& res) {
     if (!token.empty()) res.push_back(token);
 }
 
-std::string FileSys::get_absolute_path(Directory* dir) {
-    std::string res = "";
-    while (!dir->root) {
-        res = '/' + dir->name + res;
-        dir = dir->parent;
-    }
-    if (res.empty()) res = '/';
-    return res;
-}
-
 bool FileSys::switch_path(std::string& path, bool is_recorded = true, bool is_redo = false) {
     // 更改路径
     std::string order = "cd";
@@ -395,10 +379,10 @@ bool FileSys::undo() {
     Operation* op = history.top();
     if (op->type == "cd") {
         // 恢复旧的内容
-        std::string path = this->get_absolute_path(this->cwd);
         redo_list.push_back(new Operation(this->cwd, op->type));
         this->cwd = op->dir;
     } else if (op->type == "mkdir") {
+        // 空文件夹也保证指针能再使用
         Directory* dir = *std::get_if<Directory*>(&(this->cwd->content.at(op->name)));
         redo_list.push_back(new Operation(this->cwd, op->name, op->type, dir));
         this->cwd->remove_dir(op->name, false, true);
