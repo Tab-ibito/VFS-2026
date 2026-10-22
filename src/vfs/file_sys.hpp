@@ -104,26 +104,14 @@ class File {
     }
     void write_bin(int offset, std::string& hexdata) {
         int start = offset * 2;
+        int end = start + hexdata.size();
         std::string buf = ""; // 设置隔离缓冲
 
         // 源数据有尾回填
-        if (start + hexdata.size() < this->content.size()) {
-            buf = this->content.substr(start + hexdata.size(), this->content.size() - start - hexdata.size());
-        }
+        if (content.size() < end) content.resize(end, '0');
 
-        // start 从源文件中间开始，先去尾
-        if (this->content.size() > start) {
-            this->content.resize(start);
-        }
-
-        // start 从源文件后面开始，没到offset的地方先填充
-        if (this->content.size() < start) {
-            this->content.resize(start, '0');
-        }
-
-        // 覆写
-        this->content += hexdata;
-        this->content += buf;
+        // 复制覆盖
+        std::copy(hexdata.begin(), hexdata.end(), content.begin() + start);
     }
     int get_size() {
         if (this->type == "bin") return this->content.size() / 2;
