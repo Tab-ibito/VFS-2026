@@ -29,7 +29,7 @@ class Operation {
     public:
     Directory* dir;
     std::string name, type, file_type;
-    bool is_created, is_removed;
+    bool is_end;
     int diff;
     std::string old_content;
     // 增（文件夹 / 文件），删改（文件）
@@ -56,12 +56,13 @@ class Operation {
         this->file_type = file_type;
         this->diff = diff;
     }
-    Operation(Directory* dir, std::string& name, std::string& type, std::string& file_type, int diff, std::string& old_content) {
+    Operation(Directory* dir, std::string& name, std::string& type, std::string& file_type, int diff, bool is_end, std::string& old_content) {
         this->dir = dir;
         this->name = name;
         this->type = type;
         this->file_type = file_type;
         this->diff = diff;
+        this->is_end = is_end;
         this->old_content = old_content;
     }
 };  
@@ -222,20 +223,30 @@ class Directory {
         return file->read_bin(offset, length);
     }
 
-    bool write_bin(std::string& name, int offset, std::string& hexdata, bool is_recorded = true) {
+    bool write_bin(std::string& name, int offset, std::string& hexdata, bool is_recorded = true, bool is_end = false) {
         // 写二进制文件内容
         std::string order = "write";
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type != "bin") return false;
-        int diff = offset < file->get_size() ? offset : file->get_size();
-        std::string old_content = offset > file->get_size() ? "" : file->content.substr(offset*2);
+        int diff = offset < file->get_size() ? offset : file->get_size(); // 开始出现差异的字节位置
+        int end = offset + hexdata.size() / 2; // 结束修改的字节位置
+        std::string old_content = "";
+
         this->seq_size.erase({name, file->get_size()});
         if (is_recorded) {
+            if (file->get_size() <= end){ // 扩展了文件的长度，那么原信息没有尾部，撤销时需要恢复尾部，is_end 为 true
+                old_content = offset > file->get_size() ? "" : file->content.substr(offset*2);
+                this->filesys->add_history(new Operation(this, name, order, file->type, diff, true, old_content));
+            } else {
+                old_content = offset > file->get_size() ? "" : file->content.substr(offset*2, hexdata.size());
+                this->filesys->add_history(new Operation(this, name, order, file->type, diff, false, old_content));   
+            }
             file->write_bin(offset, hexdata);
-            this->filesys->add_history(new Operation(this, name, order, file->type, diff, old_content));
         } else {
-            file->content = file->content.substr(0, offset*2) + hexdata;
+            std::string end = "";
+            if (!is_end) end = file->content.substr(offset*2 + hexdata.size());
+            file->content = file->content.substr(0, offset*2) + hexdata + end;
         } 
         this->seq_size.insert({name, file->get_size()});
         return true;
@@ -344,7 +355,7 @@ bool FileSys::undo() {
         // 可以先删再建
         this->cwd->append(op->name, op->old_content, false, op->diff);
     } else if (op->type == "write") {
-        this->cwd->write_bin(op->name, op->diff, op->old_content, false);
+        this->cwd->write_bin(op->name, op->diff, op->old_content, false, op->is_end);
     } else if (op->type == "rm") {
         // 重建文件
         this->cwd->create_file(op->file_type, op->name, op->old_content, false);
