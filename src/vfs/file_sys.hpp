@@ -49,6 +49,13 @@ class Operation {
         this->file_type = file_type;
         this->old_content = old_content;
     }
+        Operation(Directory* dir, std::string& name, std::string& type, std::string& file_type, int diff) {
+        this->dir = dir;
+        this->name = name;
+        this->type = type;
+        this->file_type = file_type;
+        this->diff = diff;
+    }
     Operation(Directory* dir, std::string& name, std::string& type, std::string& file_type, int diff, std::string& old_content) {
         this->dir = dir;
         this->name = name;
@@ -182,7 +189,7 @@ class Directory {
         return true;
     }
 
-    bool append(std::string& name, std::string& content) {
+    bool append(std::string& name, std::string& content, bool is_recorded = true, int diff = 0) {
         // 追加内容
         std::string order = "append";
         if (!is_valid_file(name)) return false;
@@ -190,8 +197,11 @@ class Directory {
         if (file->type == "bin") return false;
         std::string old_content = file->content;
         this->seq_size.erase({name, file->get_size()});
-        file->append(content);
-        this->filesys->add_history(new Operation(this, name, order, file->type, old_content));
+        if(is_recorded) {
+            this->filesys->add_history(new Operation(this, name, order, file->type, file->get_size()));
+            file->append(content);
+        }
+        else file->content = file->content.substr(0, diff);
         this->seq_size.insert({name, file->get_size()});
         return true;
     }
@@ -334,8 +344,7 @@ bool FileSys::undo() {
         this->cwd->remove_file(op->name, false);
     } else if (op->type == "append") {
         // 可以先删再建
-        this->cwd->remove_file(op->name, false);
-        this->cwd->create_file(op->file_type, op->name, op->old_content, false);
+        this->cwd->append(op->name, op->old_content, false, op->diff);
     } else if (op->type == "write") {
         this->cwd->write_bin(op->name, op->diff, op->old_content, false);
     } else if (op->type == "rm") {
