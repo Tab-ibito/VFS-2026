@@ -15,6 +15,8 @@
 
 std::string get_content(bool is_binary = false) {
     char c;
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(nullptr);
     std::string content;
     std::cin >> c;
     do {
