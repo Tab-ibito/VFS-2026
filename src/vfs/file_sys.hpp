@@ -184,7 +184,7 @@ class Directory {
         if (this->content.find(name) != this->content.end()) return false;
         File* new_file = new File(type, name, content);
         this->content.insert({name, new_file});
-        if (is_recorded) this->filesys->add_history(new Operation(this, name, order, type, content));
+        if (is_recorded) this->filesys->add_history(new Operation(this, name, order));
         this->seq_dict.insert(name);
         this->seq_size.insert({name, new_file->get_size()});
         return true;
