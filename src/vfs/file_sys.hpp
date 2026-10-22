@@ -5,6 +5,9 @@
 #include <variant>
 #include <stack>
 #include <algorithm>
+#include <unordered_map>
+#include <set>
+
 class Operation;
 class File;
 class Directory;
@@ -64,7 +67,7 @@ class File {
     }
     // 输出
     void output() {
-        std::cout << this->name << ':' << this->content << std::endl;
+        std::cout << this->name << ':' << this->content << '\n';
     }
     // 二进制文件读取
     bool read_bin(int offset, int length) {
@@ -81,7 +84,7 @@ class File {
                 cnt ++;
             }
         }
-        std::cout << std::endl;
+        std::cout << '\n';
         return true;
     }
     void write_bin(int offset, std::string hexdata) {
@@ -122,7 +125,8 @@ class Directory {
     bool root = false; // 是否是根目录
     std::string name; // 文件夹名
     Directory* parent; // 父文件夹指针
-    std::map<std::string, std::variant<Directory*, File*>> content; // 子文件指针，键值是文件夹名
+    std::unordered_map<std::string, std::variant<Directory*, File*>> content; // 子文件指针，键值是文件夹名
+    std::set<std::string> seq_dict; // 按照字典序输出文件
 
     Directory(FileSys* filesys) {
         root = true;
@@ -142,6 +146,7 @@ class Directory {
         Directory* new_dir = new Directory(name, this, this->filesys);
         this->content.insert({name, new_dir});
         this->filesys->add_history(new Operation(this, name, order));
+        this->seq_dict.insert(name);
         return true;
     }
 
@@ -152,6 +157,7 @@ class Directory {
         File* new_file = new File(type, name, content);
         this->content.insert({name, new_file});
         if (is_recorded) this->filesys->add_history(new Operation(this, name, order, type, content));
+        this->seq_dict.insert(name);
         return true;
     }
 
@@ -173,14 +179,6 @@ class Directory {
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type == "bin") return false;
         file->output();
-        return true;
-    }
-
-    bool get_type(std::string& name, std::string& file_type) {
-        // 获取文件类型
-        if (!is_valid_file(name)) return false;
-        File* file = *std::get_if<File*>(&(this->content.at(name)));
-        file_type = file->type;
         return true;
     }
 
@@ -210,6 +208,7 @@ class Directory {
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (is_recorded) this->filesys->add_history(new Operation(this, name, order, file->type, file->content));
         this->content.erase(name); // 清除content的文件名
+        this->seq_dict.erase(name);
         return true;
     }
 
@@ -219,15 +218,17 @@ class Directory {
         auto ptr = std::get_if<File*>(&(this->content.at(name)));
         if (ptr == nullptr) {
             Directory* dir = *std::get_if<Directory*>(&(this->content.at(name)));
-            std::cout << name << ':' << "dir" << ':' << 0 << std::endl;
+            std::cout << name << ':' << "dir" << ':' << 0 << '\n';
         } else {
             File* file = *ptr;
-            std::cout << name << ':' << file->type << ':' << file->get_size() << std::endl;
+            std::cout << name << ':' << file->type << ':' << file->get_size() << '\n';
         }
         return true;
     }
 
     void print_topk(int k) {
+        std::ios::sync_with_stdio(false);
+        std::cin.tie(nullptr);
         std::vector<std::pair<std::string, int>> seq;
         for (auto& item : this->content) {
             std::string name = item.first;
@@ -244,7 +245,7 @@ class Directory {
         int cnt = 0;
         auto it = seq.begin();
         while (cnt < k && it != seq.end()) {
-            std::cout << it->first << ':' << it->second << std::endl;
+            std::cout << it->first << ':' << it->second << '\n';
             cnt ++;
             it ++;
         }
@@ -252,11 +253,10 @@ class Directory {
 
     void print_dir() {
         // ls 指令打印当前目录，带空格
-        for (auto item : this->content) {
-            std::cout << item.first;
-            if (std::get_if<Directory*>(&item.second) != nullptr) std::cout << '/';
-            std::cout << std::endl;
-            
+        for (auto& item : this->seq_dict) {
+            std::cout << item;
+            if (std::get_if<Directory*>(&(this->content.at(item))) != nullptr) std::cout << '/';
+            std::cout << '\n';
         }
     }
     ~Directory(){}
@@ -318,6 +318,7 @@ bool FileSys::undo() {
         this->cwd = op->dir;
     } else if (op->type == "mkdir") {
         this->cwd->content.erase(op->name);
+        this->cwd->seq_dict.erase(op->name);
     } else if (op->type == "create") {
         // 逆操作删掉文件
         this->cwd->remove_file(op->name, false);
