@@ -232,9 +232,8 @@ class Directory {
             }
             file->write_bin(offset, hexdata);
         } else {
-            std::string end = "";
-            if (!is_end) end = file->content.substr(offset*2 + hexdata.size());
-            file->content = file->content.substr(0, offset*2) + hexdata + end;
+            if (is_end) file->content.resize(offset*2 + hexdata.size()); 
+            std::copy(hexdata.begin(), hexdata.end(), file->content.begin() + offset*2);
         } 
         this->seq_size.insert({name, file->get_size()});
         return true;
