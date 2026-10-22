@@ -19,11 +19,8 @@ std::string get_content(bool is_binary = false) {
     std::cin.tie(nullptr);
     std::string content;
     std::cin >> c;
-    do {
-        c = std::cin.get();
-        if (!is_binary || c != ' ') content.push_back(c);
-    } while (c != '"');
-    content.pop_back();
+    std::getline(std::cin, content, '"');
+    if (is_binary) content.erase(std::remove(content.begin(), content.end(), ' '), content.end());
     return content;
 }
 

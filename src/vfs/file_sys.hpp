@@ -95,34 +95,34 @@ class File {
         std::cout << this->name << ':';
         for (int i = start; i < end; i++) {
             if (cnt > 0 && cnt % 2 == 0) std::cout << ' ';
-            if (this->content.at(i) != ' ') {
-                std::cout << this->content.at(i);
-                cnt ++;
-            }
+            std::cout << this->content.at(i);
+            cnt ++;
         }
         std::cout << '\n';
         return true;
     }
     void write_bin(int offset, std::string& hexdata) {
         int start = offset * 2;
-        std::stack<char> buf; // 设置隔离缓冲
+        std::string buf = ""; // 设置隔离缓冲
 
-        while (this->content.size() > start) {
-            buf.push(content.back());
-            this->content.pop_back();
+        // 源数据有尾回填
+        if (start + hexdata.size() < this->content.size()) {
+            buf = this->content.substr(start + hexdata.size(), this->content.size() - start - hexdata.size());
         }
-        // 没到offset的地方先填充
-        while (this->content.size() < start) {
-            this->content.push_back('0');
+
+        // start 从源文件中间开始，先去尾
+        if (this->content.size() > start) {
+            this->content.resize(start);
         }
-        this->content += hexdata;
-        int cnt = 0, len = hexdata.size();
+
+        // start 从源文件后面开始，没到offset的地方先填充
+        if (this->content.size() < start) {
+            this->content.resize(start, '0');
+        }
+
         // 覆写
-        while (!buf.empty()) {
-            if (cnt >= hexdata.size()) this->content.push_back(buf.top());
-            buf.pop();
-            cnt ++;
-        }
+        this->content += hexdata;
+        this->content += buf;
     }
     int get_size() {
         if (this->type == "bin") return this->content.size() / 2;
