@@ -195,7 +195,6 @@ class Directory {
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type == "bin") return false;
-        std::string old_content = file->content;
         this->seq_size.erase({name, file->get_size()});
         if(is_recorded) {
             this->filesys->add_history(new Operation(this, name, order, file->type, file->get_size()));
@@ -331,7 +330,6 @@ bool FileSys::switch_path(std::string& path) {
 bool FileSys::undo() {
     // TODO for bonus
     if (history.empty()) return false;
-
     Operation* op = history.top();
     if (op->type == "cd") {
         // 恢复旧的内容
