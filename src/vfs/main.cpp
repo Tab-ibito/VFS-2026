@@ -95,6 +95,8 @@ int main() {
         } else if (order == "undo") {
             if (!filesys.undo())
                 std::cout << "Invalid operation" << '\n';
+        } else if (order == "r") {
+            std::cout << "---" <<std::endl;
         }
     }
     return 0;

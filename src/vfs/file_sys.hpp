@@ -30,6 +30,7 @@ class Operation {
     Directory* dir;
     std::string name, type, file_type;
     bool is_created, is_removed;
+    int diff;
     std::string old_content;
     // 增（文件夹 / 文件），删改（文件）
     Operation(Directory* dir, std::string& type) {
@@ -46,6 +47,14 @@ class Operation {
         this->name = name;
         this->type = type;
         this->file_type = file_type;
+        this->old_content = old_content;
+    }
+    Operation(Directory* dir, std::string& name, std::string& type, std::string& file_type, int diff, std::string& old_content) {
+        this->dir = dir;
+        this->name = name;
+        this->type = type;
+        this->file_type = file_type;
+        this->diff = diff;
         this->old_content = old_content;
     }
 };  
@@ -90,6 +99,7 @@ class File {
     void write_bin(int offset, std::string& hexdata) {
         int start = offset * 2;
         std::stack<char> buf; // 设置隔离缓冲
+
         while (this->content.size() > start) {
             buf.push(content.back());
             this->content.pop_back();
@@ -203,16 +213,21 @@ class Directory {
         return file->read_bin(offset, length);
     }
 
-    bool write_bin(std::string& name, int offset, std::string& hexdata) {
+    bool write_bin(std::string& name, int offset, std::string& hexdata, bool is_recorded = true) {
         // 写二进制文件内容
         std::string order = "write";
         if (!is_valid_file(name)) return false;
         File* file = *std::get_if<File*>(&(this->content.at(name)));
         if (file->type != "bin") return false;
+        int diff = offset < file->get_size() ? offset : file->get_size();
+        std::string old_content = offset > file->get_size() ? "" : file->content.substr(offset*2);
         this->seq_size.erase({name, file->get_size()});
-        std::string old_content = file->content;
-        file->write_bin(offset, hexdata);
-        this->filesys->add_history(new Operation(this, name, order, file->type, old_content));
+        if (is_recorded) {
+            file->write_bin(offset, hexdata);
+            this->filesys->add_history(new Operation(this, name, order, file->type, diff, old_content));
+        } else {
+            file->content = file->content.substr(0, offset*2) + hexdata;
+        } 
         this->seq_size.insert({name, file->get_size()});
         return true;
     }
@@ -322,8 +337,7 @@ bool FileSys::undo() {
         this->cwd->remove_file(op->name, false);
         this->cwd->create_file(op->file_type, op->name, op->old_content, false);
     } else if (op->type == "write") {
-        this->cwd->remove_file(op->name, false);
-        this->cwd->create_file(op->file_type, op->name, op->old_content, false);
+        this->cwd->write_bin(op->name, op->diff, op->old_content, false);
     } else if (op->type == "rm") {
         // 重建文件
         this->cwd->create_file(op->file_type, op->name, op->old_content, false);
