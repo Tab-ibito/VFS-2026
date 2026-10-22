@@ -13,7 +13,7 @@ class File;
 class Directory;
 class FileSys{
     private:
-    std::vector<std::string> split_path(std::string& path);
+    void split_path(std::string& path, std::vector<std::string>& res);
     std::stack<Operation*> history;
     public:
     Directory* cwd;
@@ -62,7 +62,7 @@ class File {
     }
 
     // 追加内容
-    void append(std::string content) {
+    void append(std::string& content) {
         this->content.append(content);
     }
     // 输出
@@ -87,7 +87,7 @@ class File {
         std::cout << '\n';
         return true;
     }
-    void write_bin(int offset, std::string hexdata) {
+    void write_bin(int offset, std::string& hexdata) {
         int start = offset * 2;
         std::stack<char> buf; // 设置隔离缓冲
         while (this->content.size() > start) {
@@ -212,7 +212,7 @@ class Directory {
         return true;
     }
 
-    bool get_stat(std::string name) {
+    bool get_stat(std::string& name) {
         // 输出文件类型和大小
         if (this->content.find(name) == this->content.end()) return false;
         auto ptr = std::get_if<File*>(&(this->content.at(name)));
@@ -262,9 +262,8 @@ class Directory {
     ~Directory(){}
 };
 
-std::vector<std::string> FileSys::split_path(std::string& path) {
+void FileSys::split_path(std::string& path, std::vector<std::string>& res) {
     // 分割路径
-    std::vector<std::string> res;
     std::string token;
     for (auto& c : path) {
         if (c == '/') {
@@ -273,7 +272,6 @@ std::vector<std::string> FileSys::split_path(std::string& path) {
         } else token.push_back(c);
     }
     if (!token.empty()) res.push_back(token);
-    return res;
 }
 
 bool FileSys::switch_path(std::string& path) {
@@ -281,7 +279,8 @@ bool FileSys::switch_path(std::string& path) {
     std::string order = "cd";
     if (path.empty()) return false;
     Directory* new_path;
-    std::vector<std::string> parsed = split_path(path);
+    std::vector<std::string> parsed;
+    split_path(path, parsed);
     if (path[0] == '/') {
         new_path = root;
     } else {
